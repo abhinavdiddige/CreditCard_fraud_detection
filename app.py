@@ -201,8 +201,17 @@ elif page == "📈 Model Comparison":
         st.subheader("📊 Performance Metrics Table")
         
         # Display styled dataframe
-        st.dataframe(
-            comparison_df.style.highlight_max(axis=0, subset=['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC'], color='black')
+        styled_df = (
+            comparison_df.style
+            .highlight_max(
+                axis=0,
+                subset=['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC'],
+                color='lightgreen'
+            )
+            .set_properties(**{
+                'color': 'black',              # 👈 Force text color
+                'background-color': 'white'    # 👈 Force background
+            })
             .format({
                 'Accuracy': '{:.4f}',
                 'AUC': '{:.4f}',
@@ -210,9 +219,10 @@ elif page == "📈 Model Comparison":
                 'Recall': '{:.4f}',
                 'F1': '{:.4f}',
                 'MCC': '{:.4f}'
-            }),
-            use_container_width=True
+            })
         )
+        
+        st.dataframe(styled_df, use_container_width=True)
         
         # Best model highlight
         best_f1_model = comparison_df.loc[comparison_df['F1'].idxmax(), 'Model']
