@@ -202,7 +202,7 @@ elif page == "📈 Model Comparison":
         
         # Display styled dataframe
         st.dataframe(
-            comparison_df.style.highlight_max(axis=0, subset=['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC'], color='lightgreen')
+            comparison_df.style.highlight_max(axis=0, subset=['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC'], color='black')
             .format({
                 'Accuracy': '{:.4f}',
                 'AUC': '{:.4f}',
