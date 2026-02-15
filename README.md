@@ -145,9 +145,7 @@ credit-card-fraud-detection/
 │   ├── feature_names.pkl           # List of feature names used
 │   ├── model_comparison.csv        # Performance metrics comparison
 │   └── confusion_matrices.png      # Visualization of confusion matrices
-│
-└── data/                           # Dataset directory (not included in repo)
-    └── creditcard.csv              # Download from Kaggle
+
 ```
 
 ## 🛠️ Installation & Setup
@@ -264,14 +262,6 @@ The app will open in your default browser at `http://localhost:8501`
 
 4. **Access Your Live App**
    - You'll receive a public URL: `https://your-app-name.streamlit.app`
-   - Share this URL for demonstration and evaluation
-
-### Important Notes for Deployment
-
-- ✅ Commit all `.pkl` model files (required for app functionality)
-- ❌ Do NOT commit `creditcard.csv` (150MB+ file, too large for GitHub)
-- ✅ Verify `requirements.txt` has all dependencies with correct versions
-- ✅ Test app locally before deploying
 
 ## 📱 Streamlit App Features
 
@@ -453,19 +443,6 @@ For each model, the following metrics were calculated on the test set:
    - LIME (Local Interpretable Model-agnostic Explanations)
    - Feature contribution analysis for individual predictions
 
-## 👨‍💻 Author
-
-**Student Name**: [Your Name]  
-**Student ID**: [Your Student ID]  
-**Program**: M.Tech (AIML/DSE)  
-**Institution**: BITS Pilani - Work Integrated Learning Programmes  
-**Course**: Machine Learning  
-**Assignment**: Assignment 2 - Classification Models & Deployment  
-**Submission Date**: February 15, 2026
-
-## 📄 License
-
-This project is created for educational purposes as part of the Machine Learning course curriculum at BITS Pilani.
 
 ## 🙏 Acknowledgments
 
@@ -482,31 +459,6 @@ This project is created for educational purposes as part of the Machine Learning
 ## 📧 Contact
 
 For questions or feedback regarding this project:
-- **Email**: [your.email@example.com]
-- **GitHub**: [github.com/YOUR_USERNAME]
-- **LinkedIn**: [linkedin.com/in/YOUR_PROFILE]
+- **Email**: abhinav.diddige@gmail.com
+- **GitHub**: https://github.com/abhinavdiddige
 
----
-
-## 📝 Assignment Compliance
-
-This project fulfills all requirements of Machine Learning Assignment 2:
-
-✅ **Dataset**: 12 features, 25,134 instances (exceeds minimum requirements)  
-✅ **Models**: All 6 required classification models implemented  
-✅ **Metrics**: All 6 required evaluation metrics calculated  
-✅ **Streamlit App**: All 4 required features implemented  
-✅ **GitHub**: Complete source code, requirements.txt, comprehensive README  
-✅ **Deployment**: Live app deployed on Streamlit Community Cloud  
-✅ **Documentation**: Comparison tables, observations, and detailed analysis  
-
-**Live Demo**: [Your Streamlit App URL]  
-**GitHub Repository**: [Your GitHub Repository URL]
-
----
-
-**Note**: This project was completed on BITS Virtual Lab as per assignment requirements. A screenshot of the execution has been included in the submission PDF.
-
----
-
-*Built with ❤️ using Python, Scikit-learn, XGBoost, and Streamlit*
