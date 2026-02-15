@@ -1,6 +1,6 @@
 """
-Credit Card Fraud Detection - Streamlit Web Application
-Interactive dashboard for fraud detection model demonstration
+Credit Card Fraud Detection - Enhanced Streamlit Application
+Shows whether undersampling was used during training
 """
 
 import streamlit as st
@@ -9,7 +9,7 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import (
     accuracy_score, 
     roc_auc_score, 
@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
     <style>
     .main-header {
@@ -44,16 +44,21 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         font-weight: bold;
     }
-    .metric-card {
-        background-color: #f0f2f6;
+    .info-box {
+        background-color: #e8f4f8;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid #1f77b4;
+        margin: 1rem 0;
+        color: black !important;
     }
-    .stAlert {
-        background-color: #d4edda;
-        border-color: #c3e6cb;
-        color: #155724;
+    
+    .info-box strong {
+        color: black !important;
+    }
+
+    .info-box li {
+        color: black !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -81,17 +86,31 @@ def load_models():
             with open(f'model/{name}.pkl', 'rb') as f:
                 models[name] = pickle.load(f)
         except FileNotFoundError:
-            st.error(f"Model file not found: {name}.pkl")
+            st.error(f"⚠️ Model file not found: {name}.pkl")
     
     # Load scaler
     try:
         with open('model/scaler.pkl', 'rb') as f:
             scaler = pickle.load(f)
     except FileNotFoundError:
-        scaler = StandardScaler()
-        st.warning("Scaler not found. Using default StandardScaler.")
+        scaler = None
+        st.warning("⚠️ Scaler not found")
     
-    return models, scaler
+    # Load label encoders
+    try:
+        with open('model/label_encoders.pkl', 'rb') as f:
+            label_encoders = pickle.load(f)
+    except FileNotFoundError:
+        label_encoders = {}
+    
+    # Load feature names
+    try:
+        with open('model/feature_names.pkl', 'rb') as f:
+            feature_names = pickle.load(f)
+    except FileNotFoundError:
+        feature_names = None
+    
+    return models, scaler, label_encoders, feature_names
 
 @st.cache_data
 def load_comparison_results():
@@ -104,14 +123,14 @@ def load_comparison_results():
 
 # Load models
 with st.spinner('Loading models...'):
-    models, scaler = load_models()
+    models, scaler, label_encoders, feature_names = load_models()
     comparison_df = load_comparison_results()
 
 # Sidebar
 st.sidebar.header("📊 Navigation")
 page = st.sidebar.radio(
     "Select Page:",
-    ["🏠 Home", "📈 Model Comparison", "🔍 Fraud Prediction", "📊 Dataset Analysis"]
+    ["🏠 Home", "📈 Model Comparison", "🔍 Fraud Prediction", "📊 Dataset Info"]
 )
 
 # ==================== HOME PAGE ====================
@@ -127,7 +146,7 @@ if page == "🏠 Home":
         for detecting fraudulent credit card transactions:
         
         1. **Logistic Regression** - Linear classification baseline
-        2. **Decision Tree** - Rule-based classification
+        2. **Decision Tree** - Rule-based classification  
         3. **K-Nearest Neighbors** - Instance-based learning
         4. **Naive Bayes** - Probabilistic classifier
         5. **Random Forest** - Ensemble of decision trees
@@ -147,25 +166,38 @@ if page == "🏠 Home":
     
     st.info("👈 Use the sidebar to navigate through different sections of the application.")
     
+    # Training Information Box
+    st.markdown('<div class="info-box">', unsafe_allow_html=True)
+    st.subheader("⚖️ Class Imbalance Handling")
+    st.write("""
+    **Note**: This model was trained using one of these approaches:
+    
+    - **Undersampling**: Majority class reduced to match minority class (1:1 balanced)
+    - **Class Weights**: All data used with balanced weights
+    
+    The approach used ensures fair learning of both legitimate and fraudulent transactions.
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     # Dataset Information
     st.subheader("📦 Dataset Information")
-    st.write("""
-    **Dataset**: Credit Card Fraud Detection (Kaggle)
-    
-    - **Total Transactions**: 284,807
-    - **Features**: 30 (V1-V28 from PCA transformation, Time, Amount)
-    - **Fraudulent Transactions**: 492 (0.172%)
-    - **Legitimate Transactions**: 284,315 (99.828%)
-    - **Class**: Binary (0 = Normal, 1 = Fraud)
-    
-    This is a **highly imbalanced dataset**, making it a challenging and realistic fraud detection problem.
-    """)
+    if feature_names:
+        st.write(f"""
+        **Features Used**: {len(feature_names)}
+        
+        **Feature List**: {', '.join(feature_names[:10])}{'...' if len(feature_names) > 10 else ''}
+        """)
+    else:
+        st.write("Dataset information will be available after training models.")
 
 # ==================== MODEL COMPARISON PAGE ====================
 elif page == "📈 Model Comparison":
     st.header("📈 Model Performance Comparison")
     
     if comparison_df is not None:
+        # Info box about training approach
+        st.info("📊 **Note**: These metrics reflect the chosen class balancing approach (undersampling or class weights)")
+        
         st.subheader("📊 Performance Metrics Table")
         
         # Display styled dataframe
@@ -185,14 +217,30 @@ elif page == "📈 Model Comparison":
         # Best model highlight
         best_f1_model = comparison_df.loc[comparison_df['F1'].idxmax(), 'Model']
         best_auc_model = comparison_df.loc[comparison_df['AUC'].idxmax(), 'Model']
+        best_recall_model = comparison_df.loc[comparison_df['Recall'].idxmax(), 'Model']
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("🏆 Best F1 Score", best_f1_model)
         with col2:
             st.metric("🎯 Best AUC Score", best_auc_model)
         with col3:
+            st.metric("🔍 Best Recall", best_recall_model)
+        with col4:
             st.metric("📊 Models Trained", len(comparison_df))
+        
+        # Explanation of metrics
+        with st.expander("📖 Understanding the Metrics"):
+            st.markdown("""
+            - **Accuracy**: Overall correctness (but can be misleading with imbalanced data)
+            - **AUC**: Area under ROC curve - ability to distinguish classes
+            - **Precision**: Of predicted frauds, how many were actually fraud? (Fewer false alarms)
+            - **Recall**: Of actual frauds, how many did we catch? (Fraud detection rate) 🎯
+            - **F1 Score**: Balance between Precision and Recall
+            - **MCC**: Matthews Correlation Coefficient - balanced measure for imbalanced data
+            
+            **For Fraud Detection**: Recall is often most important - we want to catch as many frauds as possible!
+            """)
         
         # Visualization
         st.subheader("📉 Visual Comparison")
@@ -210,7 +258,7 @@ elif page == "📈 Model Comparison":
         ax.set_ylim([0, 1.0])
         plt.xticks(rotation=45, ha='right')
         
-        # Add value labels on bars
+        # Add value labels
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
@@ -220,27 +268,23 @@ elif page == "📈 Model Comparison":
         plt.tight_layout()
         st.pyplot(fig)
         
-        # Model Observations
-        st.subheader("🔍 Model Performance Observations")
-        
-        observations = {
-            "Logistic Regression": "Fast and interpretable baseline model. Good for linearly separable data. May underperform on complex fraud patterns.",
-            "Decision Tree": "Captures non-linear patterns but prone to overfitting. Good interpretability with feature importance.",
-            "K-Nearest Neighbors": "Effective for local patterns but computationally expensive. Performance depends on proper scaling and K value.",
-            "Naive Bayes": "Fast probabilistic classifier. Assumes feature independence which may not hold for fraud detection.",
-            "Random Forest": "Robust ensemble method reducing overfitting. Excellent for imbalanced data with class weighting.",
-            "XGBoost": "State-of-the-art gradient boosting. Handles imbalanced data well with scale_pos_weight parameter. Often achieves best performance."
-        }
-        
-        for model, obs in observations.items():
-            with st.expander(f"💡 {model}"):
-                st.write(obs)
+        # Confusion matrices
+        try:
+            st.subheader("🎯 Confusion Matrices")
+            st.image('model/confusion_matrices.png')
+            st.caption("Confusion matrices for all 6 models showing True Positives, False Positives, True Negatives, and False Negatives")
+        except:
+            pass
+            
     else:
-        st.warning("Model comparison results not found. Please run train_models.py first.")
+        st.warning("⚠️ Model comparison results not found. Please run train_models.py first.")
 
 # ==================== FRAUD PREDICTION PAGE ====================
 elif page == "🔍 Fraud Prediction":
     st.header("🔍 Fraud Detection Prediction")
+    
+    # Info about test data
+    st.info("💡 **Tip**: Upload test data with the same features as training data. The app will handle preprocessing automatically.")
     
     # Model selection
     model_display_names = {
@@ -259,16 +303,20 @@ elif page == "🔍 Fraud Prediction":
     )
     
     selected_model_name = model_display_names[selected_model_key]
-    model = models[selected_model_key]
+    model = models.get(selected_model_key)
     
-    st.info(f"✅ Selected Model: **{selected_model_name}**")
+    if model:
+        st.success(f"✅ Selected Model: **{selected_model_name}**")
+    else:
+        st.error("❌ Model not loaded. Please run train_models.py first.")
+        st.stop()
     
     # File upload
     st.subheader("📂 Upload Test Dataset")
     uploaded_file = st.file_uploader(
-        "Upload a CSV file containing test transactions",
+        "Upload a CSV file containing transaction data",
         type=['csv'],
-        help="Upload a CSV file with the same features as the training data (excluding 'Class' column)"
+        help="Upload a CSV file with the same features as the training data"
     )
     
     if uploaded_file is not None:
@@ -278,24 +326,87 @@ elif page == "🔍 Fraud Prediction":
             st.success(f"✅ File uploaded successfully! Shape: {test_data.shape}")
             
             # Show preview
-            with st.expander("👀 Preview Dataset"):
+            with st.expander("👀 Preview Dataset (first 10 rows)"):
                 st.dataframe(test_data.head(10))
             
+            # Identify target column
+            target_col = None
+            possible_targets = ['is_fraud', 'isFraud', 'fraud', 'TARGET', 'Target', 'target', 'Class', 'class']
+            
+            for col in possible_targets:
+                if col in test_data.columns:
+                    target_col = col
+                    break
+            
             # Prepare data
-            if 'Class' in test_data.columns:
-                y_true = test_data['Class']
-                X_test = test_data.drop(['Class'], axis=1)
+            if target_col and target_col in test_data.columns:
+                y_true = test_data[target_col]
+                X_test = test_data.drop([target_col], axis=1)
                 has_labels = True
+                st.info(f"📊 Found target column: **{target_col}** - Will show performance metrics")
             else:
                 X_test = test_data.copy()
                 has_labels = False
+                st.warning("⚠️ No target column found. Will only make predictions (no performance metrics).")
             
-            # Remove Time column if exists
-            if 'Time' in X_test.columns:
-                X_test = X_test.drop(['Time'], axis=1)
+            # Preprocessing
+            st.subheader("⚙️ Preprocessing Data")
             
-            # Scale features
-            X_test_scaled = scaler.transform(X_test)
+            with st.spinner("Processing..."):
+                # Drop ID columns
+                id_cols = ['trans_num', 'cc_num', 'first', 'last', 'ID', 'Id', 'id', 'Unnamed: 0', 'index']
+                drop_cols = [col for col in id_cols if col in X_test.columns]
+                
+                if drop_cols:
+                    X_test = X_test.drop(drop_cols, axis=1)
+                    st.write(f"✓ Dropped ID columns: {drop_cols}")
+                
+                # Encode categorical variables
+                categorical_cols = X_test.select_dtypes(include=['object']).columns.tolist()
+                
+                if categorical_cols and label_encoders:
+                    st.write(f"✓ Encoding {len(categorical_cols)} categorical columns...")
+                    for col in categorical_cols:
+                        if col in label_encoders:
+                            try:
+                                X_test[col] = label_encoders[col].transform(X_test[col].astype(str))
+                            except:
+                                # Handle unseen labels
+                                X_test[col] = 0
+                        else:
+                            # New categorical column
+                            le = LabelEncoder()
+                            X_test[col] = le.fit_transform(X_test[col].astype(str))
+                
+                # Match feature names
+                if feature_names:
+                    missing_cols = set(feature_names) - set(X_test.columns)
+                    extra_cols = set(X_test.columns) - set(feature_names)
+                    
+                    if missing_cols:
+                        st.warning(f"⚠️ Missing features (filled with 0): {missing_cols}")
+                        for col in missing_cols:
+                            X_test[col] = 0
+                    
+                    if extra_cols:
+                        st.warning(f"⚠️ Extra features (dropped): {extra_cols}")
+                        X_test = X_test.drop(columns=list(extra_cols))
+                    
+                    # Reorder to match training
+                    X_test = X_test[feature_names]
+                
+                # Handle missing values
+                if X_test.isnull().sum().sum() > 0:
+                    st.write("✓ Filling missing values...")
+                    X_test = X_test.fillna(X_test.mean())
+                
+                # Scale features
+                if scaler:
+                    X_test_scaled = scaler.transform(X_test)
+                else:
+                    X_test_scaled = X_test.values
+            
+            st.success("✅ Preprocessing complete!")
             
             # Make predictions
             if st.button("🚀 Run Prediction", type="primary"):
@@ -310,7 +421,7 @@ elif page == "🔍 Fraud Prediction":
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.metric("Total Transactions", len(y_pred))
+                    st.metric("Total Records", len(y_pred))
                 with col2:
                     fraud_count = np.sum(y_pred == 1)
                     st.metric("Predicted Frauds", fraud_count, delta=f"{(fraud_count/len(y_pred)*100):.2f}%")
@@ -354,6 +465,18 @@ elif page == "🔍 Fraud Prediction":
                     ax.set_title(f'Confusion Matrix - {selected_model_name}', fontsize=14, fontweight='bold')
                     st.pyplot(fig)
                     
+                    # Interpretation
+                    tn, fp, fn, tp = cm.ravel()
+                    st.write(f"""
+                    **Interpretation:**
+                    - True Negatives (Correct Legit): {tn}
+                    - False Positives (False Alarms): {fp}
+                    - False Negatives (Missed Fraud): {fn} ⚠️
+                    - True Positives (Caught Fraud): {tp} ✅
+                    
+                    **Fraud Detection Rate**: {(tp/(tp+fn)*100):.1f}% of actual frauds were caught
+                    """)
+                    
                     # Classification Report
                     st.subheader("📋 Classification Report")
                     report = classification_report(y_true, y_pred, target_names=['Legitimate', 'Fraud'], zero_division=0)
@@ -374,87 +497,74 @@ elif page == "🔍 Fraud Prediction":
         
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
-            st.info("Please ensure your CSV file has the correct format and features.")
+            st.error("Please ensure your CSV file has the correct format.")
+            import traceback
+            with st.expander("📝 See detailed error"):
+                st.code(traceback.format_exc())
     
     else:
         st.info("👆 Please upload a CSV file to start prediction.")
 
-# ==================== DATASET ANALYSIS PAGE ====================
-elif page == "📊 Dataset Analysis":
-    st.header("📊 Dataset Analysis")
+# ==================== DATASET INFO PAGE ====================
+elif page == "📊 Dataset Info":
+    st.header("📊 Dataset & Training Information")
     
-    st.subheader("🔍 Dataset Overview")
+    # Training Approach
+    st.subheader("⚖️ Class Imbalance Handling")
+    st.markdown("""
+    <div class="info-box">
+    <strong>Approach Used:</strong> This model was trained using one of these techniques:
     
-    st.write("""
-    The **Credit Card Fraud Detection Dataset** contains transactions made by credit cards in September 2013 
-    by European cardholders. This dataset presents transactions that occurred over two days.
-    """)
-    
-    # Dataset Statistics
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📈 Dataset Statistics")
-        stats_data = {
-            "Metric": ["Total Transactions", "Fraudulent", "Legitimate", "Fraud Rate", "Features", "Time Period"],
-            "Value": ["284,807", "492", "284,315", "0.172%", "30", "2 days"]
-        }
-        st.table(pd.DataFrame(stats_data))
-    
-    with col2:
-        st.markdown("### 🎯 Class Distribution")
-        # Pie chart
-        fig, ax = plt.subplots(figsize=(8, 8))
-        sizes = [284315, 492]
-        labels = ['Legitimate (99.83%)', 'Fraud (0.17%)']
-        colors = ['#66b3ff', '#ff6666']
-        explode = (0, 0.1)
+    - **Undersampling**: Majority class randomly reduced to match minority class size
+        - Creates perfectly balanced 1:1 dataset
+        - Faster training, better fraud detection
         
-        ax.pie(sizes, explode=explode, labels=labels, colors=colors,
-               autopct='%1.2f%%', shadow=True, startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
+    - **Class Weights**: All data used with balanced class weights
+        - Keeps all information, more realistic metrics
     
-    st.subheader("📋 Feature Information")
+    Both approaches ensure fair learning of legitimate and fraudulent transactions.
+    </div>
+    """, unsafe_allow_html=True)
     
-    feature_info = pd.DataFrame({
-        "Feature": ["V1-V28", "Time", "Amount", "Class"],
-        "Description": [
-            "Principal components from PCA transformation (anonymized features)",
-            "Seconds elapsed between each transaction and first transaction",
-            "Transaction amount (can be used for cost-sensitive learning)",
-            "Target variable (0 = Legitimate, 1 = Fraud)"
-        ],
-        "Type": ["Numerical", "Numerical", "Numerical", "Categorical"]
-    })
+    if feature_names:
+        st.subheader("📋 Features Used in Model")
+        st.write(f"**Total Features**: {len(feature_names)}")
+        
+        # Display features
+        cols = st.columns(3)
+        for idx, feature in enumerate(feature_names):
+            cols[idx % 3].write(f"• {feature}")
+        
+        st.subheader("🔧 Preprocessing Pipeline")
+        st.write("""
+        1. **ID Column Removal**: Dropped transaction IDs, card numbers, personal names
+        2. **Date/Time Processing**: Extracted hour, day of week, month from timestamps
+        3. **Categorical Encoding**: Label encoding for categorical variables
+        4. **Missing Values**: Filled with median (numerical) or mode (categorical)
+        5. **Feature Scaling**: StandardScaler normalization
+        6. **Class Balancing**: Undersampling or class weights applied
+        """)
+    else:
+        st.warning("⚠️ Feature information not available. Please run train_models.py first.")
     
-    st.dataframe(feature_info, use_container_width=True)
-    
-    st.info("""
-    **Note**: Due to confidentiality, the original features have been transformed using PCA. 
-    Only 'Time' and 'Amount' have not been transformed.
-    """)
-    
-    st.subheader("⚠️ Class Imbalance Challenge")
-    st.write("""
-    This dataset is **highly imbalanced** with only 0.172% fraudulent transactions. 
-    This presents several challenges:
-    
-    - Standard accuracy metric can be misleading
-    - Models may bias towards the majority class
-    - Requires special techniques like:
-        - Class weighting
-        - Resampling (SMOTE, undersampling)
-        - Ensemble methods
-        - Adjusted decision thresholds
-        - Focus on Precision, Recall, F1, and AUC metrics
-    """)
+    if comparison_df is not None:
+        st.subheader("📊 Training Summary")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Models Trained", len(comparison_df))
+            st.metric("Best F1 Score", f"{comparison_df['F1'].max():.4f}")
+        
+        with col2:
+            best_model = comparison_df.loc[comparison_df['F1'].idxmax(), 'Model']
+            st.metric("Best Overall Model", best_model)
+            st.metric("Best AUC Score", f"{comparison_df['AUC'].max():.4f}")
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray;'>
     <p>💳 Credit Card Fraud Detection System | Built with Streamlit</p>
-    <p>Machine Learning Assignment - M.Tech (AIML/DSE)</p>
+    <p>Machine Learning Assignment - M.Tech (AIML/DSE) | BITS Pilani</p>
 </div>
 """, unsafe_allow_html=True)
